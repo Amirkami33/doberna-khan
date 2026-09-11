@@ -1,1 +1,322 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
+    <title>دبرنا خان</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <meta name="theme-color" content="#090909">
+</head>
+
+<body>
+
+<div id="app">
+
+    <!-- Header -->
+    <header class="topbar">
+
+        <div>
+            <div class="brand-small">دبرنا خان</div>
+            <div class="welcome" id="welcomeUser">خوش آمدید</div>
+        </div>
+
+        <div class="coin-box">
+            <span>🪙</span>
+            <strong id="coinBalance">500</strong>
+        </div>
+
+    </header>
+
+
+    <!-- Main -->
+    <main class="home-container">
+
+        <!-- Hero -->
+        <section class="hero-card">
+
+            <div class="hero-glow"></div>
+
+            <div class="hero-content">
+
+                <div class="crown">♛</div>
+
+                <h1>دبرنا خان</h1>
+
+                <p>
+                    وارد بازی شو و شانست رو امتحان کن
+                </p>
+
+                <button class="primary-btn" onclick="goToRooms()">
+                    🎲 ورود به بازی
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- Daily Reward -->
+        <section class="daily-card">
+
+            <div class="daily-icon">
+                🎁
+            </div>
+
+            <div class="daily-info">
+
+                <h3>پاداش روزانه</h3>
+
+                <p id="dailyText">
+                    هر روز ۱۰۰ سکه رایگان
+                </p>
+
+            </div>
+
+            <button
+                id="dailyButton"
+                class="reward-btn"
+                onclick="claimDailyReward()">
+
+                دریافت
+
+            </button>
+
+        </section>
+
+
+        <!-- Quick Menu -->
+        <section class="menu-grid">
+
+            <button class="menu-card" onclick="goToRooms()">
+
+                <span class="menu-icon">🎲</span>
+
+                <strong>اتاق‌های بازی</strong>
+
+                <small>انتخاب میز</small>
+
+            </button>
+
+
+            <button class="menu-card" onclick="showProfile()">
+
+                <span class="menu-icon">👤</span>
+
+                <strong>پروفایل</strong>
+
+                <small>حساب کاربری</small>
+
+            </button>
+
+
+            <button class="menu-card" onclick="showHistory()">
+
+                <span class="menu-icon">🏆</span>
+
+                <strong>سوابق</strong>
+
+                <small>بازی‌های من</small>
+
+            </button>
+
+
+            <button class="menu-card" onclick="logoutUser()">
+
+                <span class="menu-icon">🚪</span>
+
+                <strong>خروج</strong>
+
+                <small>خروج از حساب</small>
+
+            </button>
+
+        </section>
+
+
+        <!-- Rooms -->
+        <section id="roomsSection" class="rooms-section">
+
+            <div class="section-title">
+
+                <h2>اتاق‌های بازی</h2>
+
+                <span>انتخاب کن</span>
+
+            </div>
+
+
+            <div class="rooms">
+
+                <button class="room-card" onclick="enterRoom(50)">
+
+                    <div class="room-symbol bronze">♟</div>
+
+                    <div class="room-info">
+
+                        <strong>اتاق برنزی</strong>
+
+                        <span>ورودی ۵۰ سکه</span>
+
+                    </div>
+
+                    <b>۵۰ 🪙</b>
+
+                </button>
+
+
+                <button class="room-card" onclick="enterRoom(100)">
+
+                    <div class="room-symbol silver">♟</div>
+
+                    <div class="room-info">
+
+                        <strong>اتاق نقره‌ای</strong>
+
+                        <span>ورودی ۱۰۰ سکه</span>
+
+                    </div>
+
+                    <b>۱۰۰ 🪙</b>
+
+                </button>
+
+
+                <button class="room-card" onclick="enterRoom(250)">
+
+                    <div class="room-symbol gold">♛</div>
+
+                    <div class="room-info">
+
+                        <strong>اتاق طلایی</strong>
+
+                        <span>ورودی ۲۵۰ سکه</span>
+
+                    </div>
+
+                    <b>۲۵۰ 🪙</b>
+
+                </button>
+
+
+                <button class="room-card" onclick="enterRoom(500)">
+
+                    <div class="room-symbol special">♛</div>
+
+                    <div class="room-info">
+
+                        <strong>اتاق ویژه</strong>
+
+                        <span>ورودی ۵۰۰ سکه</span>
+
+                    </div>
+
+                    <b>۵۰۰ 🪙</b>
+
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal hidden">
+
+        <div class="modal-box">
+
+            <button class="close-modal" onclick="closeModal()">×</button>
+
+            <div class="profile-avatar">👤</div>
+
+            <h2 id="profileName">کاربر</h2>
+
+            <p>عضو دبرنا خان</p>
+
+            <div class="profile-balance">
+                🪙 <span id="profileCoins">500</span> سکه
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- History Modal -->
+    <div id="historyModal" class="modal hidden">
+
+        <div class="modal-box">
+
+            <button class="close-modal" onclick="closeModal()">×</button>
+
+            <div class="profile-avatar">🏆</div>
+
+            <h2>سوابق بازی</h2>
+
+            <div id="historyList" class="history-list"></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Game Modal -->
+    <div id="gameModal" class="modal game-modal hidden">
+
+        <div class="game-box">
+
+            <button class="close-modal" onclick="closeGame()">×</button>
+
+            <div class="game-header">
+
+                <div>
+                    <strong>دبرنا خان</strong>
+                    <small id="roomTitle">اتاق بازی</small>
+                </div>
+
+                <div class="game-coins">
+                    🪙 <span id="gameCoins">500</span>
+                </div>
+
+            </div>
+
+
+            <div class="number-display">
+
+                <span>عدد اعلام شده</span>
+
+                <strong id="calledNumber">--</strong>
+
+            </div>
+
+
+            <div id="bingoCard" class="bingo-card"></div>
+
+
+            <button
+                id="callNumberBtn"
+                class="primary-btn"
+                onclick="callNextNumber()">
+
+                🔊 اعلام عدد
+
+            </button>
+
+
+            <div id="gameMessage" class="game-message"></div>
+
+        </div>
+
+    </div>
+
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
