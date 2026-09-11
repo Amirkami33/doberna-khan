@@ -1,1447 +1,1871 @@
-/* ==========================================
-   DOBERNA KHAN
-   Version 1
-   Virtual Coins Only
-========================================== */
-
-
-/* ==========================================
-   GLOBAL DATA
-========================================== */
+/* =========================================================
+   دبرنا خان
+   Virtual Coin Demo
+   ========================================================= */
 
 const STARTING_COINS = 500;
 const DAILY_REWARD = 100;
 
-const ROOMS = {
-    50: "اتاق برنزی",
-    100: "اتاق نقره‌ای",
-    250: "اتاق طلایی",
-    500: "اتاق ویژه"
-};
+let currentGame = null;
+let gameTimer = null;
+let countdownTimer = null;
+
+let speechReady = false;
+let availableVoices = [];
 
 
-/* ==========================================
+/* =========================================================
    STORAGE
-========================================== */
+   ========================================================= */
 
 function getUsers() {
-
-    return JSON.parse(
-        localStorage.getItem("doberna_users") || "{}"
-    );
-
+  try {
+    return JSON.parse(localStorage.getItem("doberna_users")) || {};
+  } catch {
+    return {};
+  }
 }
-
 
 function saveUsers(users) {
-
-    localStorage.setItem(
-        "doberna_users",
-        JSON.stringify(users)
-    );
-
+  localStorage.setItem(
+    "doberna_users",
+    JSON.stringify(users)
+  );
 }
-
 
 function getCurrentUser() {
+  const username = localStorage.getItem(
+    "doberna_current_user"
+  );
 
-    return localStorage.getItem("doberna_current_user");
+  if (!username) return null;
 
+  const users = getUsers();
+
+  return users[username] || null;
+}
+
+function saveCurrentUser(user) {
+  const users = getUsers();
+
+  users[user.username] = user;
+
+  saveUsers(users);
+
+  localStorage.setItem(
+    "doberna_current_user",
+    user.username
+  );
 }
 
 
-function setCurrentUser(username) {
+/* =========================================================
+   PAGE START
+   ========================================================= */
 
-    localStorage.setItem(
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    loadVoices();
+
+    if ("speechSynthesis" in window) {
+      speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    setupRegister();
+    setupLogin();
+
+    updateUserUI();
+    updateDailyRewardButton();
+
+  }
+);
+
+
+/* =========================================================
+   VOICE
+   ========================================================= */
+
+function loadVoices() {
+
+  if (!("speechSynthesis" in window)) {
+    return;
+  }
+
+  availableVoices =
+    speechSynthesis.getVoices() || [];
+}
+
+
+function unlockSpeech() {
+
+  if (!("speechSynthesis" in window)) {
+    speechReady = false;
+    return;
+  }
+
+  try {
+
+    speechSynthesis.cancel();
+
+    const unlock = new SpeechSynthesisUtterance(
+      "شروع بازی"
+    );
+
+    unlock.lang = "fa-IR";
+    unlock.volume = 0;
+    unlock.rate = 1;
+
+    speechSynthesis.speak(unlock);
+
+    speechReady = true;
+
+  } catch (error) {
+
+    speechReady = false;
+
+  }
+}
+
+
+/* =========================================================
+   REGISTER
+   ========================================================= */
+
+function setupRegister() {
+
+  const form =
+    document.getElementById(
+      "registerForm"
+    );
+
+  if (!form) return;
+
+  form.addEventListener(
+    "submit",
+    function (event) {
+
+      event.preventDefault();
+
+      const username =
+        document.getElementById(
+          "registerUsername"
+        ).value
+        .trim()
+        .toLowerCase();
+
+      const password =
+        document.getElementById(
+          "registerPassword"
+        ).value;
+
+      const password2 =
+        document.getElementById(
+          "registerPassword2"
+        ).value;
+
+      const message =
+        document.getElementById(
+          "registerMessage"
+        );
+
+      const users = getUsers();
+
+      if (username.length < 3) {
+
+        showFormMessage(
+          message,
+          "نام کاربری حداقل ۳ کاراکتر باشد."
+        );
+
+        return;
+      }
+
+      if (password.length < 6) {
+
+        showFormMessage(
+          message,
+          "رمز عبور باید حداقل ۶ کاراکتر باشد."
+        );
+
+        return;
+      }
+
+      if (password !== password2) {
+
+        showFormMessage(
+          message,
+          "تکرار رمز عبور درست نیست."
+        );
+
+        return;
+      }
+
+      if (users[username]) {
+
+        showFormMessage(
+          message,
+          "این نام کاربری قبلاً ثبت شده."
+        );
+
+        return;
+      }
+
+
+      const user = {
+
+        username: username,
+
+        password: password,
+
+        coins: STARTING_COINS,
+
+        createdAt:
+          Date.now(),
+
+        lastDailyReward: 0
+
+      };
+
+
+      users[username] = user;
+
+      saveUsers(users);
+
+      localStorage.setItem(
         "doberna_current_user",
         username
-    );
-
-}
+      );
 
 
-function getUserData() {
-
-    const username = getCurrentUser();
-
-    if (!username) {
-        return null;
-    }
-
-    const users = getUsers();
-
-    return users[username] || null;
-
-}
+      showFormSuccess(
+        message,
+        "حساب ساخته شد! در حال ورود..."
+      );
 
 
-function updateUserData(data) {
-
-    const username = getCurrentUser();
-
-    if (!username) {
-        return;
-    }
-
-    const users = getUsers();
-
-    users[username] = data;
-
-    saveUsers(users);
-
-}
-
-
-/* ==========================================
-   PAGE DETECTION
-========================================== */
-
-const currentPage =
-    window.location.pathname
-        .split("/")
-        .pop();
-
-
-/* ==========================================
-   AUTH REDIRECT
-========================================== */
-
-function checkAuth() {
-
-    const user = getCurrentUser();
-
-    if (
-        currentPage === "index.html" ||
-        currentPage === ""
-    ) {
-
-        if (!user) {
-
-            window.location.href = "login.html";
-
-            return false;
-        }
+      setTimeout(
+        () => {
+          window.location.href =
+            "index.html";
+        },
+        800
+      );
 
     }
-
-    return true;
+  );
 }
 
 
-checkAuth();
-
-
-/* ==========================================
-   REGISTER
-========================================== */
-
-const registerForm =
-    document.getElementById("registerForm");
-
-
-if (registerForm) {
-
-    registerForm.addEventListener(
-        "submit",
-        function (event) {
-
-            event.preventDefault();
-
-            const username =
-                document
-                    .getElementById("registerUsername")
-                    .value
-                    .trim()
-                    .toLowerCase();
-
-            const password =
-                document
-                    .getElementById("registerPassword")
-                    .value;
-
-            const password2 =
-                document
-                    .getElementById("registerPassword2")
-                    .value;
-
-            const message =
-                document.getElementById(
-                    "registerMessage"
-                );
-
-
-            if (username.length < 3) {
-
-                showMessage(
-                    message,
-                    "نام کاربری حداقل باید ۳ حرف باشد.",
-                    "error"
-                );
-
-                return;
-            }
-
-
-            if (password.length < 6) {
-
-                showMessage(
-                    message,
-                    "رمز عبور باید حداقل ۶ کاراکتر باشد.",
-                    "error"
-                );
-
-                return;
-            }
-
-
-            if (password !== password2) {
-
-                showMessage(
-                    message,
-                    "رمزهای عبور یکسان نیستند.",
-                    "error"
-                );
-
-                return;
-            }
-
-
-            const users = getUsers();
-
-
-            if (users[username]) {
-
-                showMessage(
-                    message,
-                    "این نام کاربری قبلاً ثبت شده است.",
-                    "error"
-                );
-
-                return;
-            }
-
-
-            users[username] = {
-
-                username: username,
-
-                password: password,
-
-                coins: STARTING_COINS,
-
-                createdAt:
-                    new Date().toISOString(),
-
-                lastDailyReward: null,
-
-                history: []
-
-            };
-
-
-            saveUsers(users);
-
-            setCurrentUser(username);
-
-
-            showMessage(
-                message,
-                "حساب با موفقیت ساخته شد 🎉",
-                "success"
-            );
-
-
-            setTimeout(
-                function () {
-
-                    window.location.href =
-                        "index.html";
-
-                },
-                700
-            );
-
-        }
-    );
-
-}
-
-
-/* ==========================================
+/* =========================================================
    LOGIN
-========================================== */
+   ========================================================= */
 
-const loginForm =
-    document.getElementById("loginForm");
+function setupLogin() {
 
-
-if (loginForm) {
-
-    loginForm.addEventListener(
-        "submit",
-        function (event) {
-
-            event.preventDefault();
-
-
-            const username =
-                document
-                    .getElementById("loginUsername")
-                    .value
-                    .trim()
-                    .toLowerCase();
-
-
-            const password =
-                document
-                    .getElementById("loginPassword")
-                    .value;
-
-
-            const message =
-                document.getElementById(
-                    "loginMessage"
-                );
-
-
-            const users = getUsers();
-
-
-            if (!users[username]) {
-
-                showMessage(
-                    message,
-                    "کاربری با این نام پیدا نشد.",
-                    "error"
-                );
-
-                return;
-            }
-
-
-            if (users[username].password !== password) {
-
-                showMessage(
-                    message,
-                    "رمز عبور اشتباه است.",
-                    "error"
-                );
-
-                return;
-            }
-
-
-            setCurrentUser(username);
-
-
-            showMessage(
-                message,
-                "ورود موفق بود 🎉",
-                "success"
-            );
-
-
-            setTimeout(
-                function () {
-
-                    window.location.href =
-                        "index.html";
-
-                },
-                500
-            );
-
-        }
+  const form =
+    document.getElementById(
+      "loginForm"
     );
 
+  if (!form) return;
+
+  form.addEventListener(
+    "submit",
+    function (event) {
+
+      event.preventDefault();
+
+      const username =
+        document.getElementById(
+          "loginUsername"
+        ).value
+        .trim()
+        .toLowerCase();
+
+      const password =
+        document.getElementById(
+          "loginPassword"
+        ).value;
+
+      const message =
+        document.getElementById(
+          "loginMessage"
+        );
+
+      const users = getUsers();
+
+      const user =
+        users[username];
+
+
+      if (!user) {
+
+        showFormMessage(
+          message,
+          "نام کاربری یا رمز عبور اشتباه است."
+        );
+
+        return;
+      }
+
+
+      if (user.password !== password) {
+
+        showFormMessage(
+          message,
+          "نام کاربری یا رمز عبور اشتباه است."
+        );
+
+        return;
+      }
+
+
+      localStorage.setItem(
+        "doberna_current_user",
+        username
+      );
+
+
+      showFormSuccess(
+        message,
+        "ورود موفق بود..."
+      );
+
+
+      setTimeout(
+        () => {
+          window.location.href =
+            "index.html";
+        },
+        600
+      );
+
+    }
+  );
 }
 
 
-/* ==========================================
-   HOME INIT
-========================================== */
+/* =========================================================
+   FORM MESSAGE
+   ========================================================= */
 
-if (
-    currentPage === "index.html" ||
-    currentPage === ""
+function showFormMessage(
+  element,
+  text
 ) {
 
-    initializeHome();
+  if (!element) return;
 
+  element.textContent = text;
+
+  element.style.color =
+    "#df6974";
 }
 
 
-function initializeHome() {
-
-    const user = getUserData();
-
-    if (!user) {
-        return;
-    }
-
-
-    const welcome =
-        document.getElementById(
-            "welcomeUser"
-        );
-
-    const balance =
-        document.getElementById(
-            "coinBalance"
-        );
-
-
-    if (welcome) {
-
-        welcome.textContent =
-            `سلام ${user.username} 👑`;
-
-    }
-
-
-    if (balance) {
-
-        balance.textContent =
-            formatNumber(user.coins);
-
-    }
-
-
-    updateDailyRewardUI();
-
-}
-
-
-/* ==========================================
-   DAILY REWARD
-========================================== */
-
-function canClaimDailyReward() {
-
-    const user = getUserData();
-
-    if (!user) {
-        return false;
-    }
-
-
-    if (!user.lastDailyReward) {
-        return true;
-    }
-
-
-    const last =
-        new Date(user.lastDailyReward);
-
-
-    const now =
-        new Date();
-
-
-    const difference =
-        now.getTime() -
-        last.getTime();
-
-
-    const oneDay =
-        24 * 60 * 60 * 1000;
-
-
-    return difference >= oneDay;
-
-}
-
-
-function claimDailyReward() {
-
-    const user = getUserData();
-
-    if (!user) {
-        return;
-    }
-
-
-    if (!canClaimDailyReward()) {
-
-        showTemporaryMessage(
-            "پاداش امروز رو قبلاً گرفتی 🎁"
-        );
-
-        return;
-    }
-
-
-    user.coins += DAILY_REWARD;
-
-    user.lastDailyReward =
-        new Date().toISOString();
-
-
-    updateUserData(user);
-
-
-    updateBalanceDisplay();
-
-    updateDailyRewardUI();
-
-
-    showTemporaryMessage(
-        `🎁 ${DAILY_REWARD} سکه به موجودی شما اضافه شد`
-    );
-
-}
-
-
-function updateDailyRewardUI() {
-
-    const button =
-        document.getElementById(
-            "dailyButton"
-        );
-
-    const text =
-        document.getElementById(
-            "dailyText"
-        );
-
-
-    if (!button || !text) {
-        return;
-    }
-
-
-    if (canClaimDailyReward()) {
-
-        button.disabled = false;
-
-        button.textContent = "دریافت";
-
-        text.textContent =
-            `امروز ${DAILY_REWARD} سکه رایگان داری`;
-
-    } else {
-
-        button.disabled = true;
-
-        button.textContent = "دریافت شد";
-
-        text.textContent =
-            "پاداش امروز دریافت شده";
-
-    }
-
-}
-
-
-/* ==========================================
-   ROOMS
-========================================== */
-
-function goToRooms() {
-
-    const section =
-        document.getElementById(
-            "roomsSection"
-        );
-
-
-    if (section) {
-
-        section.scrollIntoView({
-            behavior: "smooth"
-        });
-
-    }
-
-}
-
-
-function enterRoom(entryFee) {
-
-    const user = getUserData();
-
-    if (!user) {
-        return;
-    }
-
-
-    if (user.coins < entryFee) {
-
-        showTemporaryMessage(
-            "سکه کافی نداری 🪙"
-        );
-
-        return;
-    }
-
-
-    /*
-       فعلاً هزینه ورود از سکه کم می‌شود.
-       در نسخه Firebase این عملیات باید
-       سمت سرور/Database امن انجام شود.
-    */
-
-    user.coins -= entryFee;
-
-
-    user.history =
-        user.history || [];
-
-
-    user.history.unshift({
-
-        type: "entry",
-
-        room: ROOMS[entryFee],
-
-        amount: entryFee,
-
-        date:
-            new Date().toISOString()
-
-    });
-
-
-    updateUserData(user);
-
-    updateBalanceDisplay();
-
-
-    openGame(
-        entryFee
-    );
-
-}
-
-
-/* ==========================================
-   GAME
-========================================== */
-
-let currentGame = null;
-
-
-function openGame(entryFee) {
-
-    currentGame = {
-
-        entryFee: entryFee,
-
-        numbers: [],
-
-        called: [],
-
-        gameOver: false
-
-    };
-
-
-    const modal =
-        document.getElementById(
-            "gameModal"
-        );
-
-
-    const roomTitle =
-        document.getElementById(
-            "roomTitle"
-        );
-
-
-    const gameCoins =
-        document.getElementById(
-            "gameCoins"
-        );
-
-
-    if (roomTitle) {
-
-        roomTitle.textContent =
-            ROOMS[entryFee];
-
-    }
-
-
-    if (gameCoins) {
-
-        const user =
-            getUserData();
-
-        gameCoins.textContent =
-            formatNumber(user.coins);
-
-    }
-
-
-    createBingoCard();
-
-
-    document.getElementById(
-        "calledNumber"
-    ).textContent = "--";
-
-
-    document.getElementById(
-        "gameMessage"
-    ).textContent =
-        "عددها را یکی‌یکی اعلام کن";
-
-
-    document.getElementById(
-        "callNumberBtn"
-    ).disabled = false;
-
-
-    modal.classList.remove(
-        "hidden"
-    );
-
-}
-
-
-function closeGame() {
-
-    const modal =
-        document.getElementById(
-            "gameModal"
-        );
-
-
-    if (modal) {
-
-        modal.classList.add(
-            "hidden"
-        );
-
-    }
-
-}
-
-
-/* ==========================================
-   BINGO CARD
-========================================== */
-
-function createBingoCard() {
-
-    const card =
-        document.getElementById(
-            "bingoCard"
-        );
-
-
-    if (!card) {
-        return;
-    }
-
-
-    card.innerHTML = "";
-
-
-    /*
-       کارت ۵ × ۵
-       خانه وسط FREE
-    */
-
-    const numbers =
-        generateUniqueNumbers(
-            24,
-            1,
-            99
-        );
-
-
-    currentGame.numbers =
-        numbers;
-
-
-    let index = 0;
-
-
-    for (
-        let row = 0;
-        row < 5;
-        row++
-    ) {
-
-        for (
-            let col = 0;
-            col < 5;
-            col++
-        ) {
-
-            const cell =
-                document.createElement(
-                    "button"
-                );
-
-
-            cell.className =
-                "bingo-cell";
-
-
-            if (
-                row === 2 &&
-                col === 2
-            ) {
-
-                cell.textContent =
-                    "FREE";
-
-                cell.classList.add(
-                    "free"
-                );
-
-                cell.dataset.marked =
-                    "true";
-
-            } else {
-
-                const number =
-                    numbers[index];
-
-                index++;
-
-                cell.textContent =
-                    number;
-
-                cell.dataset.number =
-                    number;
-
-            }
-
-
-            card.appendChild(
-                cell
-            );
-
-        }
-
-    }
-
-}
-
-
-/* ==========================================
-   CALL NUMBER
-========================================== */
-
-function callNextNumber() {
-
-    if (
-        !currentGame ||
-        currentGame.gameOver
-    ) {
-
-        return;
-    }
-
-
-    if (
-        currentGame.called.length >= 99
-    ) {
-
-        return;
-    }
-
-
-    let number;
-
-
-    do {
-
-        number =
-            Math.floor(
-                Math.random() * 99
-            ) + 1;
-
-    } while (
-        currentGame.called.includes(
-            number
-        )
-    );
-
-
-    currentGame.called.push(
-        number
-    );
-
-
-    const display =
-        document.getElementById(
-            "calledNumber"
-        );
-
-
-    display.textContent =
-        number;
-
-
-    markNumber(
-        number
-    );
-
-
-    checkWin();
-
-}
-
-
-/* ==========================================
-   MARK NUMBER
-========================================== */
-
-function markNumber(number) {
-
-    const cells =
-        document.querySelectorAll(
-            ".bingo-cell"
-        );
-
-
-    cells.forEach(
-        function (cell) {
-
-            if (
-                Number(
-                    cell.dataset.number
-                ) === number
-            ) {
-
-                cell.classList.add(
-                    "marked"
-                );
-
-                cell.dataset.marked =
-                    "true";
-
-            }
-
-        }
-    );
-
-}
-
-
-/* ==========================================
-   CHECK HORIZONTAL WIN
-========================================== */
-
-function checkWin() {
-
-    const cells =
-        Array.from(
-            document.querySelectorAll(
-                ".bingo-cell"
-            )
-        );
-
-
-    for (
-        let row = 0;
-        row < 5;
-        row++
-    ) {
-
-        let complete = true;
-
-
-        for (
-            let col = 0;
-            col < 5;
-            col++
-        ) {
-
-            const index =
-                row * 5 + col;
-
-
-            const cell =
-                cells[index];
-
-
-            if (
-                cell.dataset.marked !==
-                "true"
-            ) {
-
-                complete = false;
-
-                break;
-            }
-
-        }
-
-
-        if (complete) {
-
-            winGame();
-
-            return;
-        }
-
-    }
-
-}
-
-
-/* ==========================================
-   WIN GAME
-========================================== */
-
-function winGame() {
-
-    if (
-        !currentGame ||
-        currentGame.gameOver
-    ) {
-
-        return;
-    }
-
-
-    currentGame.gameOver =
-        true;
-
-
-    /*
-       فعلاً جایزه برد را
-       ۲ برابر ورودی در نظر گرفتیم.
-    */
-
-    const reward =
-        currentGame.entryFee * 2;
-
-
-    const user =
-        getUserData();
-
-
-    user.coins += reward;
-
-
-    user.history =
-        user.history || [];
-
-
-    user.history.unshift({
-
-        type: "win",
-
-        room:
-            ROOMS[
-                currentGame.entryFee
-            ],
-
-        amount: reward,
-
-        date:
-            new Date().toISOString()
-
-    });
-
-
-    updateUserData(user);
-
-    updateBalanceDisplay();
-
-
-    const gameCoins =
-        document.getElementById(
-            "gameCoins"
-        );
-
-
-    if (gameCoins) {
-
-        gameCoins.textContent =
-            formatNumber(user.coins);
-
-    }
-
-
-    const message =
-        document.getElementById(
-            "gameMessage"
-        );
-
-
-    message.innerHTML =
-        `🏆 برنده شدی! <br> +${formatNumber(reward)} سکه`;
-
-
-    document.getElementById(
-        "callNumberBtn"
-    ).disabled = true;
-
-}
-
-
-/* ==========================================
-   PROFILE
-========================================== */
-
-function showProfile() {
-
-    const user =
-        getUserData();
-
-
-    if (!user) {
-        return;
-    }
-
-
-    document.getElementById(
-        "profileName"
-    ).textContent =
-        user.username;
-
-
-    document.getElementById(
-        "profileCoins"
-    ).textContent =
-        formatNumber(user.coins);
-
-
-    document.getElementById(
-        "profileModal"
-    ).classList.remove(
-        "hidden"
-    );
-
-}
-
-
-/* ==========================================
-   HISTORY
-========================================== */
-
-function showHistory() {
-
-    const user =
-        getUserData();
-
-
-    if (!user) {
-        return;
-    }
-
-
-    const list =
-        document.getElementById(
-            "historyList"
-        );
-
-
-    if (
-        !user.history ||
-        user.history.length === 0
-    ) {
-
-        list.innerHTML =
-            "<p>هنوز سابقه‌ای نداری.</p>";
-
-    } else {
-
-        list.innerHTML =
-            user.history
-                .slice(0, 10)
-                .map(
-                    function (item) {
-
-                        const sign =
-                            item.type === "win"
-                                ? "+"
-                                : "-";
-
-
-                        const icon =
-                            item.type === "win"
-                                ? "🏆"
-                                : "🎲";
-
-
-                        return `
-                            <div style="
-                                display:flex;
-                                justify-content:space-between;
-                                padding:12px 0;
-                                border-bottom:1px solid #222;
-                            ">
-                                <span>
-                                    ${icon}
-                                    ${item.room}
-                                </span>
-
-                                <strong style="
-                                    color:${item.type === "win"
-                                        ? "#43d17c"
-                                        : "#e85b5b"};
-                                ">
-                                    ${sign}${formatNumber(item.amount)} 🪙
-                                </strong>
-                            </div>
-                        `;
-
-                    }
-                )
-                .join("");
-
-    }
-
-
-    document.getElementById(
-        "historyModal"
-    ).classList.remove(
-        "hidden"
-    );
-
-}
-
-
-/* ==========================================
-   CLOSE MODAL
-========================================== */
-
-function closeModal() {
-
-    document
-        .querySelectorAll(".modal")
-        .forEach(
-            function (modal) {
-
-                modal.classList.add(
-                    "hidden"
-                );
-
-            }
-        );
-
-}
-
-
-/* ==========================================
-   LOGOUT
-========================================== */
-
-function logoutUser() {
-
-    localStorage.removeItem(
-        "doberna_current_user"
-    );
-
-
-    window.location.href =
-        "login.html";
-
-}
-
-
-/* ==========================================
-   BALANCE
-========================================== */
-
-function updateBalanceDisplay() {
-
-    const user =
-        getUserData();
-
-
-    if (!user) {
-        return;
-    }
-
-
-    const balance =
-        document.getElementById(
-            "coinBalance"
-        );
-
-
-    if (balance) {
-
-        balance.textContent =
-            formatNumber(
-                user.coins
-            );
-
-    }
-
-
-    const profileCoins =
-        document.getElementById(
-            "profileCoins"
-        );
-
-
-    if (profileCoins) {
-
-        profileCoins.textContent =
-            formatNumber(
-                user.coins
-            );
-
-    }
-
-}
-
-
-/* ==========================================
-   UTILITIES
-========================================== */
-
-function generateUniqueNumbers(
-    count,
-    min,
-    max
+function showFormSuccess(
+  element,
+  text
 ) {
 
-    const numbers = [];
+  if (!element) return;
+
+  element.textContent = text;
+
+  element.style.color =
+    "#59d597";
+}
 
 
-    while (
-        numbers.length < count
-    ) {
+/* =========================================================
+   USER UI
+   ========================================================= */
 
-        const number =
-            Math.floor(
-                Math.random() *
-                (max - min + 1)
-            ) + min;
+function updateUserUI() {
 
+  const user =
+    getCurrentUser();
 
-        if (
-            !numbers.includes(
-                number
-            )
-        ) {
+  if (!user) {
 
-            numbers.push(
-                number
-            );
+    const coin =
+      document.getElementById(
+        "coinBalance"
+      );
 
-        }
-
+    if (coin) {
+      coin.textContent = "0";
     }
 
+    return;
+  }
 
-    return numbers;
 
+  const coin =
+    document.getElementById(
+      "coinBalance"
+    );
+
+  if (coin) {
+
+    coin.textContent =
+      formatNumber(user.coins);
+
+  }
+
+
+  const profileCoins =
+    document.getElementById(
+      "profileCoins"
+    );
+
+  if (profileCoins) {
+
+    profileCoins.textContent =
+      formatNumber(user.coins);
+
+  }
+
+
+  const profileUsername =
+    document.getElementById(
+      "profileUsername"
+    );
+
+  if (profileUsername) {
+
+    profileUsername.textContent =
+      user.username;
+
+  }
 }
 
 
 function formatNumber(number) {
 
-    return Number(number)
-        .toLocaleString("fa-IR");
+  return Number(number || 0)
+    .toLocaleString("fa-IR");
 
 }
 
 
-function showMessage(
-    element,
-    text,
-    type
+/* =========================================================
+   DAILY REWARD
+   ========================================================= */
+
+function claimDailyReward() {
+
+  const user =
+    getCurrentUser();
+
+  if (!user) {
+
+    showToast(
+      "ابتدا وارد حساب شو."
+    );
+
+    return;
+  }
+
+
+  const now = Date.now();
+
+  const last =
+    Number(
+      user.lastDailyReward || 0
+    );
+
+  const oneDay =
+    24 * 60 * 60 * 1000;
+
+
+  if (
+    last &&
+    now - last < oneDay
+  ) {
+
+    const remaining =
+      oneDay -
+      (now - last);
+
+    showToast(
+      "پاداش امروز رو قبلاً گرفتی 🎁"
+    );
+
+    return;
+  }
+
+
+  user.coins += DAILY_REWARD;
+
+  user.lastDailyReward =
+    now;
+
+
+  saveCurrentUser(user);
+
+  updateUserUI();
+
+  updateDailyRewardButton();
+
+
+  showToast(
+    "۱۰۰ سکه به موجودی اضافه شد 🎁"
+  );
+}
+
+
+function updateDailyRewardButton() {
+
+  const button =
+    document.getElementById(
+      "dailyRewardBtn"
+    );
+
+  if (!button) return;
+
+
+  const user =
+    getCurrentUser();
+
+  if (!user) return;
+
+
+  const now =
+    Date.now();
+
+  const last =
+    Number(
+      user.lastDailyReward || 0
+    );
+
+  const oneDay =
+    24 * 60 * 60 * 1000;
+
+
+  if (
+    last &&
+    now - last < oneDay
+  ) {
+
+    button.disabled = true;
+
+    button.textContent =
+      "دریافت شد";
+
+  } else {
+
+    button.disabled = false;
+
+    button.textContent =
+      "دریافت";
+
+  }
+}
+
+
+/* =========================================================
+   ENTER ROOM
+   ========================================================= */
+
+function enterRoom(
+  fee,
+  roomName
 ) {
 
-    if (!element) {
-        return;
+  const user =
+    getCurrentUser();
+
+  if (!user) {
+
+    showToast(
+      "برای ورود به بازی ابتدا وارد حساب شو."
+    );
+
+    setTimeout(
+      () => {
+        window.location.href =
+          "login.html";
+      },
+      900
+    );
+
+    return;
+  }
+
+
+  fee = Number(fee);
+
+
+  if (user.coins < fee) {
+
+    showToast(
+      "سکه کافی نداری 🪙"
+    );
+
+    return;
+  }
+
+
+  user.coins -= fee;
+
+  saveCurrentUser(user);
+
+  updateUserUI();
+
+
+  openGame(
+    fee,
+    roomName
+  );
+}
+
+
+/* =========================================================
+   OPEN GAME
+   ========================================================= */
+
+function openGame(
+  fee,
+  roomName
+) {
+
+  const modal =
+    document.getElementById(
+      "gameModal"
+    );
+
+  if (!modal) return;
+
+
+  currentGame = {
+
+    fee: Number(fee),
+
+    roomName:
+      roomName || "اتاق بازی",
+
+    numbers: [],
+
+    calledNumbers: new Set(),
+
+    card: [],
+
+    gameStarted: false,
+
+    gameOver: false,
+
+    win: false
+
+  };
+
+
+  const room =
+    document.getElementById(
+      "gameRoomName"
+    );
+
+  if (room) {
+    room.textContent =
+      currentGame.roomName;
+  }
+
+
+  const number =
+    document.getElementById(
+      "calledNumber"
+    );
+
+  if (number) {
+    number.textContent =
+      "--";
+  }
+
+
+  const status =
+    document.getElementById(
+      "spokenStatus"
+    );
+
+  if (status) {
+
+    status.textContent =
+      "آماده شروع...";
+
+  }
+
+
+  const message =
+    document.getElementById(
+      "gameMessage"
+    );
+
+  if (message) {
+
+    message.textContent =
+      "";
+
+    message.className =
+      "game-message";
+
+  }
+
+
+  const startButton =
+    document.getElementById(
+      "startGameBtn"
+    );
+
+  if (startButton) {
+
+    startButton.style.display =
+      "block";
+
+    startButton.textContent =
+      "شروع بازی";
+
+  }
+
+
+  createBingoCard();
+
+  modal.classList.remove(
+    "hidden"
+  );
+}
+
+
+/* =========================================================
+   BINGO CARD
+   ========================================================= */
+
+function createBingoCard() {
+
+  const container =
+    document.getElementById(
+      "bingoCard"
+    );
+
+  if (!container) return;
+
+
+  container.innerHTML = "";
+
+
+  const numbers =
+    generateUniqueNumbers(24);
+
+
+  currentGame.card =
+    numbers.slice();
+
+
+  let index = 0;
+
+
+  for (
+    let row = 0;
+    row < 5;
+    row++
+  ) {
+
+    for (
+      let col = 0;
+      col < 5;
+      col++
+    ) {
+
+      const cell =
+        document.createElement(
+          "div"
+        );
+
+      cell.className =
+        "bingo-cell";
+
+
+      if (
+        row === 2 &&
+        col === 2
+      ) {
+
+        cell.classList.add(
+          "free",
+          "marked"
+        );
+
+        cell.textContent =
+          "★";
+
+        cell.dataset.free =
+          "true";
+
+      } else {
+
+        const value =
+          numbers[index++];
+
+        cell.textContent =
+          value.toLocaleString(
+            "fa-IR"
+          );
+
+        cell.dataset.number =
+          value;
+
+      }
+
+
+      container.appendChild(
+        cell
+      );
+
     }
 
+  }
+}
+
+
+/* =========================================================
+   RANDOM NUMBERS
+   ========================================================= */
+
+function generateUniqueNumbers(
+  count
+) {
+
+  const result = [];
+
+  while (
+    result.length < count
+  ) {
+
+    const number =
+      Math.floor(
+        Math.random() * 99
+      ) + 1;
+
+    if (
+      !result.includes(number)
+    ) {
+
+      result.push(number);
+
+    }
+
+  }
+
+  return result;
+}
+
+
+function generateCallNumbers() {
+
+  const numbers = [];
+
+  for (
+    let i = 1;
+    i <= 99;
+    i++
+  ) {
+
+    numbers.push(i);
+
+  }
+
+
+  for (
+    let i = numbers.length - 1;
+    i > 0;
+    i--
+  ) {
+
+    const j =
+      Math.floor(
+        Math.random() *
+        (i + 1)
+      );
+
+    [
+      numbers[i],
+      numbers[j]
+    ] = [
+      numbers[j],
+      numbers[i]
+    ];
+
+  }
+
+
+  return numbers;
+}
+
+
+/* =========================================================
+   START AUTOMATIC GAME
+   ========================================================= */
+
+function startAutomaticGame() {
+
+  if (!currentGame) {
+    return;
+  }
+
+
+  if (
+    currentGame.gameStarted
+  ) {
+    return;
+  }
+
+
+  currentGame.gameStarted =
+    true;
+
+  currentGame.gameOver =
+    false;
+
+
+  const button =
+    document.getElementById(
+      "startGameBtn"
+    );
+
+  if (button) {
+
+    button.style.display =
+      "none";
+
+  }
+
+
+  unlockSpeech();
+
+
+  currentGame.numbers =
+    generateCallNumbers();
+
+
+  currentGame.calledNumbers =
+    new Set();
+
+
+  setGameStatus(
+    "بازی شروع شد..."
+  );
+
+
+  startCountdown();
+
+}
+
+
+/* =========================================================
+   COUNTDOWN
+   ========================================================= */
+
+function startCountdown() {
+
+  const countdown =
+    document.getElementById(
+      "countdown"
+    );
+
+  if (!countdown) {
+
+    callNextNumber();
+
+    return;
+  }
+
+
+  let value = 3;
+
+
+  countdown.textContent =
+    toPersianDigits(value);
+
+
+  countdownTimer =
+    setInterval(
+      () => {
+
+        value--;
+
+
+        if (value <= 0) {
+
+          clearInterval(
+            countdownTimer
+          );
+
+          countdown.textContent =
+            "";
+
+          callNextNumber();
+
+          return;
+        }
+
+
+        countdown.textContent =
+          toPersianDigits(value);
+
+      },
+      1000
+    );
+
+}
+
+
+/* =========================================================
+   CALL NEXT NUMBER
+   ========================================================= */
+
+function callNextNumber() {
+
+  if (!currentGame) {
+    return;
+  }
+
+
+  if (
+    currentGame.gameOver
+  ) {
+    return;
+  }
+
+
+  if (
+    currentGame.numbers.length === 0
+  ) {
+
+    finishNoWinner();
+
+    return;
+  }
+
+
+  const number =
+    currentGame.numbers.shift();
+
+
+  currentGame.calledNumbers.add(
+    number
+  );
+
+
+  displayCalledNumber(
+    number
+  );
+
+
+  markNumber(
+    number
+  );
+
+
+  speakNumber(
+    number
+  );
+
+
+  if (
+    checkHorizontalWin()
+  ) {
+
+    setTimeout(
+      () => {
+        winGame();
+      },
+      700
+    );
+
+    return;
+  }
+
+
+  gameTimer =
+    setTimeout(
+      () => {
+
+        callNextNumber();
+
+      },
+      2300
+    );
+
+}
+
+
+/* =========================================================
+   DISPLAY NUMBER
+   ========================================================= */
+
+function displayCalledNumber(
+  number
+) {
+
+  const element =
+    document.getElementById(
+      "calledNumber"
+    );
+
+  if (element) {
 
     element.textContent =
-        text;
+      number.toLocaleString(
+        "fa-IR"
+      );
 
-
-    element.className =
-        `form-message ${type}`;
+  }
 
 }
 
 
-function showTemporaryMessage(
-    text
+/* =========================================================
+   MARK NUMBER
+   ========================================================= */
+
+function markNumber(
+  number
 ) {
 
-    let toast =
-        document.getElementById(
-            "toastMessage"
-        );
-
-
-    if (!toast) {
-
-        toast =
-            document.createElement(
-                "div"
-            );
-
-        toast.id =
-            "toastMessage";
-
-
-        toast.style.position =
-            "fixed";
-
-        toast.style.bottom =
-            "25px";
-
-        toast.style.left =
-            "50%";
-
-        toast.style.transform =
-            "translateX(-50%)";
-
-        toast.style.zIndex =
-            "9999";
-
-        toast.style.padding =
-            "12px 18px";
-
-        toast.style.borderRadius =
-            "14px";
-
-        toast.style.background =
-            "#222";
-
-        toast.style.border =
-            "1px solid #555";
-
-        toast.style.color =
-            "white";
-
-        toast.style.fontSize =
-            "13px";
-
-        toast.style.boxShadow =
-            "0 10px 30px rgba(0,0,0,.5)";
-
-
-        document.body.appendChild(
-            toast
-        );
-
-    }
-
-
-    toast.textContent =
-        text;
-
-
-    clearTimeout(
-        window.toastTimer
+  const cells =
+    document.querySelectorAll(
+      ".bingo-cell"
     );
 
 
-    window.toastTimer =
-        setTimeout(
-            function () {
+  cells.forEach(
+    cell => {
 
-                toast.remove();
-
-            },
-            2500
+      const value =
+        Number(
+          cell.dataset.number
         );
 
+
+      if (
+        value === number
+      ) {
+
+        cell.classList.add(
+          "marked"
+        );
+
+      }
+
+    }
+  );
+
 }
+
+
+/* =========================================================
+   HORIZONTAL WIN
+   ========================================================= */
+
+function checkHorizontalWin() {
+
+  const cells =
+    document.querySelectorAll(
+      ".bingo-cell"
+    );
+
+
+  if (
+    cells.length !== 25
+  ) {
+
+    return false;
+
+  }
+
+
+  for (
+    let row = 0;
+    row < 5;
+    row++
+  ) {
+
+    let complete = true;
+
+
+    for (
+      let col = 0;
+      col < 5;
+      col++
+    ) {
+
+      const index =
+        row * 5 + col;
+
+      const cell =
+        cells[index];
+
+
+      if (
+        !cell.classList.contains(
+          "marked"
+        )
+      ) {
+
+        complete = false;
+
+        break;
+
+      }
+
+    }
+
+
+    if (complete) {
+
+      for (
+        let col = 0;
+        col < 5;
+        col++
+      ) {
+
+        const index =
+          row * 5 + col;
+
+        cells[index]
+          .classList.add(
+            "winner"
+          );
+
+      }
+
+
+      return true;
+
+    }
+
+  }
+
+
+  return false;
+
+}
+
+
+/* =========================================================
+   WIN
+   ========================================================= */
+
+function winGame() {
+
+  if (!currentGame) {
+    return;
+  }
+
+
+  if (
+    currentGame.gameOver
+  ) {
+    return;
+  }
+
+
+  currentGame.gameOver =
+    true;
+
+  currentGame.win =
+    true;
+
+
+  clearGameTimers();
+
+
+  const reward =
+    currentGame.fee * 2;
+
+
+  const user =
+    getCurrentUser();
+
+
+  if (user) {
+
+    user.coins += reward;
+
+    saveCurrentUser(user);
+
+    updateUserUI();
+
+  }
+
+
+  setGameStatus(
+    `🎉 برنده شدی! ${formatNumber(reward)} سکه جایزه گرفتی.`,
+    true
+  );
+
+
+  const status =
+    document.getElementById(
+      "spokenStatus"
+    );
+
+  if (status) {
+
+    status.textContent =
+      "برنده شدی 👑";
+
+  }
+
+
+  speakText(
+    "تبریک میگم، شما برنده شدید"
+  );
+
+}
+
+
+/* =========================================================
+   NO WINNER
+   ========================================================= */
+
+function finishNoWinner() {
+
+  if (!currentGame) {
+    return;
+  }
+
+
+  currentGame.gameOver =
+    true;
+
+
+  setGameStatus(
+    "تمام عددها اعلام شد، برنده‌ای پیدا نشد."
+  );
+
+}
+
+
+/* =========================================================
+   SPEECH
+   ========================================================= */
+
+function speakNumber(
+  number
+) {
+
+  const text =
+    `عدد ${persianNumber(number)}`;
+
+
+  setGameStatus(
+    `در حال اعلام ${number.toLocaleString("fa-IR")}`
+  );
+
+
+  speakText(
+    text
+  );
+
+}
+
+
+function speakText(
+  text
+) {
+
+  if (
+    !("speechSynthesis" in window)
+  ) {
+
+    setSpeechStatus(
+      "اعلام صوتی در این مرورگر فعال نیست"
+    );
+
+    return;
+
+  }
+
+
+  try {
+
+    speechSynthesis.cancel();
+
+
+    const utterance =
+      new SpeechSynthesisUtterance(
+        text
+      );
+
+
+    utterance.lang =
+      "fa-IR";
+
+    utterance.rate =
+      0.85;
+
+    utterance.pitch =
+      1;
+
+    utterance.volume =
+      1;
+
+
+    const faVoice =
+      availableVoices.find(
+        voice =>
+          voice.lang &&
+          voice.lang
+            .toLowerCase()
+            .startsWith("fa")
+      );
+
+
+    if (faVoice) {
+
+      utterance.voice =
+        faVoice;
+
+    }
+
+
+    utterance.onstart =
+      () => {
+
+        setSpeechStatus(
+          "🔊 در حال خواندن عدد..."
+        );
+
+      };
+
+
+    utterance.onend =
+      () => {
+
+        setSpeechStatus(
+          "منتظر عدد بعدی..."
+        );
+
+      };
+
+
+    utterance.onerror =
+      () => {
+
+        setSpeechStatus(
+          "عدد اعلام شد"
+        );
+
+      };
+
+
+    speechSynthesis.speak(
+      utterance
+    );
+
+  } catch (error) {
+
+    setSpeechStatus(
+      "عدد اعلام شد"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   PERSIAN NUMBERS
+   ========================================================= */
+
+function persianNumber(
+  number
+) {
+
+  const ones = [
+
+    "",
+    "یک",
+    "دو",
+    "سه",
+    "چهار",
+    "پنج",
+    "شش",
+    "هفت",
+    "هشت",
+    "نه"
+
+  ];
+
+
+  const teens = [
+
+    "ده",
+    "یازده",
+    "دوازده",
+    "سیزده",
+    "چهارده",
+    "پانزده",
+    "شانزده",
+    "هفده",
+    "هجده",
+    "نوزده"
+
+  ];
+
+
+  const tens = [
+
+    "",
+    "",
+    "بیست",
+    "سی",
+    "چهل",
+    "پنجاه",
+    "شصت",
+    "هفتاد",
+    "هشتاد",
+    "نود"
+
+  ];
+
+
+  number =
+    Number(number);
+
+
+  if (number < 10) {
+
+    return ones[number];
+
+  }
+
+
+  if (number < 20) {
+
+    return teens[number - 10];
+
+  }
+
+
+  const ten =
+    Math.floor(
+      number / 10
+    );
+
+  const one =
+    number % 10;
+
+
+  if (one === 0) {
+
+    return tens[ten];
+
+  }
+
+
+  return (
+    tens[ten] +
+    " و " +
+    ones[one]
+  );
+
+}
+
+
+/* =========================================================
+   PERSIAN DIGITS
+   ========================================================= */
+
+function toPersianDigits(
+  value
+) {
+
+  return String(value)
+    .replace(
+      /\d/g,
+      digit =>
+        "۰۱۲۳۴۵۶۷۸۹"[
+          digit
+        ]
+    );
+
+}
+
+
+/* =========================================================
+   GAME STATUS
+   ========================================================= */
+
+function setGameStatus(
+  text,
+  success = false
+) {
+
+  const element =
+    document.getElementById(
+      "gameMessage"
+    );
+
+  if (!element) return;
+
+
+  element.textContent =
+    text;
+
+
+  element.className =
+    success
+      ? "game-message success"
+      : "game-message";
+
+}
+
+
+function setSpeechStatus(
+  text
+) {
+
+  const element =
+    document.getElementById(
+      "spokenStatus"
+    );
+
+  if (element) {
+
+    element.textContent =
+      text;
+
+  }
+
+}
+
+
+/* =========================================================
+   CLOSE GAME
+   ========================================================= */
+
+function closeGame() {
+
+  clearGameTimers();
+
+
+  if (
+    "speechSynthesis" in window
+  ) {
+
+    speechSynthesis.cancel();
+
+  }
+
+
+  const modal =
+    document.getElementById(
+      "gameModal"
+    );
+
+
+  if (modal) {
+
+    modal.classList.add(
+      "hidden"
+    );
+
+  }
+
+
+  currentGame =
+    null;
+
+}
+
+
+/* =========================================================
+   CLEAR TIMERS
+   ========================================================= */
+
+function clearGameTimers() {
+
+  if (gameTimer) {
+
+    clearTimeout(
+      gameTimer
+    );
+
+    gameTimer = null;
+
+  }
+
+
+  if (countdownTimer) {
+
+    clearInterval(
+      countdownTimer
+    );
+
+    countdownTimer = null;
+
+  }
+
+}
+
+
+/* =========================================================
+   PROFILE
+   ========================================================= */
+
+function openProfile() {
+
+  const modal =
+    document.getElementById(
+      "profileModal"
+    );
+
+  if (!modal) return;
+
+
+  updateUserUI();
+
+  modal.classList.remove(
+    "hidden"
+  );
+
+}
+
+
+function closeProfile() {
+
+  const modal =
+    document.getElementById(
+      "profileModal"
+    );
+
+  if (modal) {
+
+    modal.classList.add(
+      "hidden"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+function logout() {
+
+  closeProfile();
+
+  localStorage.removeItem(
+    "doberna_current_user"
+  );
+
+
+  showToast(
+    "از حساب خارج شدی."
+  );
+
+
+  setTimeout(
+    () => {
+
+      window.location.href =
+        "login.html";
+
+    },
+    700
+  );
+
+}
+
+
+/* =========================================================
+   HOME
+   ========================================================= */
+
+function showHome() {
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+
+}
+
+
+/* =========================================================
+   TOAST
+   ========================================================= */
+
+let toastTimer = null;
+
+
+function showToast(
+  message
+) {
+
+  const toast =
+    document.getElementById(
+      "toast"
+    );
+
+  if (!toast) return;
+
+
+  toast.textContent =
+    message;
+
+
+  toast.classList.add(
+    "show"
+  );
+
+
+  if (toastTimer) {
+
+    clearTimeout(
+      toastTimer
+    );
+
+  }
+
+
+  toastTimer =
+    setTimeout(
+      () => {
+
+        toast.classList.remove(
+          "show"
+        );
+
+      },
+      2500
+    );
+
+}
+
+
+/* =========================================================
+   ESC KEY
+   ========================================================= */
+
+document.addEventListener(
+  "keydown",
+  event => {
+
+    if (
+      event.key === "Escape"
+    ) {
+
+      closeProfile();
+      closeGame();
+
+    }
+
+  }
+);
